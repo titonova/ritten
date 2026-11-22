@@ -1,0 +1,19 @@
+# Security implementation notes
+
+The machine owner and installed executable code are trusted. Remote clients, files, web results, command output, proxy headers, and tool arguments are untrusted.
+
+Remote requests cannot alter configuration, enable shell, approve calls, restore panic lock, or obtain owner credentials. Public and owner listeners are separate. Owner mutations require an authenticated session; browser origins must exactly match the local owner origin. Owner sessions remain in memory and have a fixed lifetime selected on the control page: 15 minutes, 1 hour, or 24 hours. Changing the setting resets active owner sessions from the time of the change. Five failed owner logins cause a 15-minute lockout.
+
+Every enabled built-in tool call passes credential checks, concurrency limits, schema validation, resource scopes, policy, optional approval, bounded execution, redaction, and audit. Filesystem operations reject symlinks/junctions, unsupported Windows device paths, and paths outside configured roots. Writes require read-write roots. Delete is nonrecursive and refuses configured root directories. Move refuses an existing destination.
+
+Filesystem checks are not a sandbox. An adversarial local process with write access can race directory replacement between validation and an OS operation. Hard links, inherited OS permissions, and trusted executable tools are not isolated by Ritten. Use owner-controlled roots and a low-privilege service account. Do not infer protection against malicious local code from path validation.
+
+For HTTP mutations carrying an explicit `Idempotency-Key`, mutation intent is durable before execution. The key is scoped to the authenticated client; repeats with matching arguments return the saved redacted result, while changed arguments or authority are rejected. Interrupted or failed keyed mutations remain indeterminate and never replay automatically. Ordinary stateless HTTP calls have no durable retry deduplication: after a lost response, inspect the affected resource before retrying. This does not provide transactional exactly-once external effects.
+
+Audit failures propagate; operations cannot silently bypass required logging. Tool results and audit events are bounded and redact known sensitive keys/formats. No generic redactor can detect every arbitrary secret in prose; expose only appropriate files and domains. Approval state includes complete arguments for owner review, including write contents, and is sensitive local data. It must be protected like configuration.
+
+Web fetch is HTTPS GET only, rejects non-public DNS addresses, pins the validated connection address, and rechecks each redirect. It does not send user cookies or authorization headers. The initial process tools are disabled unless explicitly enabled and require a winning policy rule for the canonical executable and working folder; configured tasks also require a task-name match. They use direct argument-array spawning without shell interpretation. Child processes still execute with Ritten's operating-system permissions; a working-directory check is not filesystem isolation. Legacy `raw_shell.run` is no longer advertised and its policy is not migrated.
+
+Panic revokes credentials, denies outstanding approvals, blocks all tool execution, and persists across restart. In manual tunnel mode the owner controls the external tunnel process: Ritten cannot stop an unmanaged proxy, but the exposed service rejects all credential use while panic-locked. Restore leaves execution paused and does not revive old credentials.
+
+Persisted state is schema-validated at startup and capped at 64MB on both reads and writes. Crash-interrupted mutations remain indeterminate. Ritten is pre-release software; validate the release build, credential-store behavior, filesystem semantics, tunnel setup, and hosted-client integration on the target machine before relying on it.

@@ -1,0 +1,55 @@
+version: 1
+server:
+  host: 127.0.0.1
+  port: 7337
+  owner_port: 7338
+  public_url: null
+  request_timeout: 30s
+  result_limit: 200KB
+owner:
+  instructions: Prefer reading before writing. Never modify credentials.
+toolsets:
+  enabled: [ritten, filesystem]
+  settings:
+    filesystem:
+      roots:
+        - path: C:/Projects/example
+          access: read-write
+      follow_symlinks: false
+    process:
+      max_concurrent: 4
+      default_timeout: 30s
+      max_runtime: 30m
+      max_output_bytes: 65536
+      tasks: {}
+policy:
+  default: deny
+  approval_timeout: 20s
+  rules:
+    - id: health
+      match:
+        tools: [ritten.health]
+      decision: allow
+    - id: protect-env
+      match:
+        tools: [filesystem.*]
+        paths: ['**/.env', '**/.ssh/**', '**/*credential*']
+      decision: deny
+    - id: project-read
+      match:
+        tools: [filesystem.read_file, filesystem.list_directory, filesystem.stat, filesystem.search]
+        paths: ['C:/Projects/example/**']
+      decision: allow
+    - id: project-write
+      match:
+        tools: [filesystem.write_file, filesystem.create_directory, filesystem.move]
+        paths: ['C:/Projects/example/**']
+      decision: ask
+    # Process remains unavailable until explicitly enabled and authorized.
+    # Replace paths/executable with canonical values for your machine.
+    # - id: project-process
+    #   match:
+    #     tools: [process.run]
+    #     paths: [C:/Projects/example, 'C:/Projects/example/**']
+    #     executables: [C:/Program Files/nodejs/node.exe]
+    #   decision: ask
